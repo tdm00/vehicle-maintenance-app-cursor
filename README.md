@@ -14,11 +14,20 @@ npm run dev
 ```bash
 npm run test:unit
 npm run test:integration
-npx playwright install --with-deps chromium
+npx playwright install --with-deps chromium firefox webkit
 npm run test:e2e
 ```
 
-End-to-end tests run the same garage flows on a desktop viewport and a phone viewport, including a reload so `localStorage` is still there.
+## Testing
+
+Unit and integration tests use Vitest and do not launch a browser. End-to-end tests run the same garage flows in four Playwright projects: desktop (Desktop Chrome, 1280×800), mobile (Pixel 5), firefox (Desktop Firefox), and webkit (Desktop Safari). Pull requests and the pre-release job run them. A failure blocks the `vN` release.
+
+Limits:
+
+- WebKit is Playwright’s build, not Safari on macOS.
+- Unit and integration tests do not launch a browser.
+- End-to-end hits the preview server, not a `file://` open.
+- CI retries a failed end-to-end test once.
 
 ## Single-file build
 

@@ -22,5 +22,9 @@ export function useGarage() {
     setData((current) => garageReducer(current, action));
   }
 
-  return { data, dispatch };
+  function replace(next: GarageData) {
+    setData(next);
+  }
+
+  return { data, dispatch, replace };
 }

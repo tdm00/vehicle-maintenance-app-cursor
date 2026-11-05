@@ -125,6 +125,29 @@ function normalizeV1(value: Record<string, unknown>): GarageData {
   };
 }
 
+/**
+ * Accept a backup payload only when every record passes the normalizers.
+ * Invalid, duplicate, or orphaned records fail the whole document.
+ */
+export function normalizeGarage(raw: unknown): GarageData | null {
+  if (!isRecord(raw) || raw.version !== SCHEMA_VERSION) return null;
+  if (!Array.isArray(raw.vehicles) || !Array.isArray(raw.serviceTypes) || !Array.isArray(raw.services) || !Array.isArray(raw.fuelUps)) return null;
+
+  const vehicles = raw.vehicles.map(normalizeVehicle);
+  const serviceTypes = raw.serviceTypes.map(normalizeServiceType);
+  const services = raw.services.map(normalizeService);
+  const fuelUps = raw.fuelUps.map(normalizeFuel);
+  if (vehicles.some((item) => item == null) || serviceTypes.some((item) => item == null) || services.some((item) => item == null) || fuelUps.some((item) => item == null)) {
+    return null;
+  }
+
+  const garage = normalizeV1({ version: SCHEMA_VERSION, vehicles, serviceTypes, services, fuelUps });
+  if (garage.vehicles.length !== vehicles.length || garage.serviceTypes.length !== serviceTypes.length || garage.services.length !== services.length || garage.fuelUps.length !== fuelUps.length) {
+    return null;
+  }
+  return garage;
+}
+
 export function migrate(raw: unknown): GarageData {
   if (!isRecord(raw)) return emptyGarage();
   if (raw.version === SCHEMA_VERSION) return normalizeV1(raw);

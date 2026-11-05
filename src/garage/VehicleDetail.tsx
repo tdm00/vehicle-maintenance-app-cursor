@@ -21,6 +21,7 @@ export function VehicleDetail({
   onRemove,
   onLogService,
   onLogFuel,
+  onEditFuel,
 }: {
   vehicle: Vehicle | null;
   serviceTypes: ServiceType[];
@@ -30,6 +31,7 @@ export function VehicleDetail({
   onRemove: () => void;
   onLogService: () => void;
   onLogFuel: () => void;
+  onEditFuel: (fuel: FuelUp) => void;
 }) {
   if (!vehicle) {
     return (
@@ -107,7 +109,7 @@ export function VehicleDetail({
           <p className="text-sm text-muted">Log two fill-ups to calculate miles per gallon.</p>
         ) : (
           <div className="max-w-full overflow-x-auto">
-            <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
+            <table className="w-full min-w-[42rem] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-line text-xs text-muted">
                   <th className="py-2 pr-3 font-medium">Date</th>
@@ -115,7 +117,8 @@ export function VehicleDetail({
                   <th className="py-2 pr-3 font-medium">Gallons</th>
                   <th className="py-2 pr-3 font-medium">Cost</th>
                   <th className="py-2 pr-3 font-medium">MPG</th>
-                  <th className="py-2 font-medium">Running average</th>
+                  <th className="py-2 pr-3 font-medium">Running average</th>
+                  <th className="py-2 text-right font-medium">Edit</th>
                 </tr>
               </thead>
               <tbody>
@@ -128,7 +131,12 @@ export function VehicleDetail({
                       <td className="py-2 pr-3">{fuel.gallons}</td>
                       <td className="py-2 pr-3">{formatMoney(fuel.cost)}</td>
                       <td className="py-2 pr-3">{formatMpg(row?.mpg ?? null)}</td>
-                      <td className="py-2">{formatMpg(row?.runningAverage ?? null)}</td>
+                      <td className="py-2 pr-3">{formatMpg(row?.runningAverage ?? null)}</td>
+                      <td className="py-2 text-right">
+                        <Button variant="ghost" aria-label={`Edit fill-up ${formatDate(fuel.date)} ${formatNumber(fuel.odometer)}`} onClick={() => onEditFuel(fuel)}>
+                          Edit
+                        </Button>
+                      </td>
                     </tr>
                   );
                 })}

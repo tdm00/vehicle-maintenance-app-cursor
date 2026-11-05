@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Button } from '../components/Button';
 import { Dialog } from '../components/Dialog';
 import { SelectField, TextField } from '../components/Field';
+import { BackupError } from '../domain/backup';
 import { todayISO } from '../domain/dates';
-import { BODY_TYPES, BODY_TYPE_LABELS, type BodyType, type FuelUp, type ServiceRecord, type ServiceType, type Vehicle } from '../domain/types';
+import { BODY_TYPES, BODY_TYPE_LABELS, type BodyType, type FuelUp, type GarageData, type ServiceRecord, type ServiceType, type Vehicle } from '../domain/types';
 
 export interface VehicleDraft {
   description: string;
@@ -181,17 +182,20 @@ export function ServiceDialog({
 
 export function FuelDialog({
   vehicle,
+  initial,
   onClose,
   onSubmit,
 }: {
   vehicle: Vehicle;
+  initial?: Pick<FuelUp, 'date' | 'odometer' | 'gallons' | 'cost'>;
   onClose: () => void;
   onSubmit: (fuel: Omit<FuelUp, 'id' | 'vehicleId'>) => void;
 }) {
-  const [date, setDate] = useState(todayISO());
-  const [odometer, setOdometer] = useState(String(Math.round(vehicle.mileage)));
-  const [gallons, setGallons] = useState('');
-  const [cost, setCost] = useState('');
+  const editing = initial != null;
+  const [date, setDate] = useState(initial?.date ?? todayISO());
+  const [odometer, setOdometer] = useState(initial ? String(initial.odometer) : String(Math.round(vehicle.mileage)));
+  const [gallons, setGallons] = useState(initial ? String(initial.gallons) : '');
+  const [cost, setCost] = useState(initial ? String(initial.cost) : '');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function submit(event: FormEvent) {
@@ -211,7 +215,7 @@ export function FuelDialog({
 
   return (
     <Dialog
-      title="Log fill-up"
+      title={editing ? 'Edit fill-up' : 'Log fill-up'}
       onClose={onClose}
       footer={
         <>
@@ -219,7 +223,7 @@ export function FuelDialog({
             Cancel
           </Button>
           <Button type="submit" form="fuel-form">
-            Save fill-up
+            {editing ? 'Save changes' : 'Save fill-up'}
           </Button>
         </>
       }
@@ -321,6 +325,167 @@ export function ConfirmRemoveDialog({ name, onClose, onConfirm }: { name: string
       }
     >
       <p className="text-sm leading-6">Remove {name}? Service records and fill-ups for this vehicle will be deleted from this browser.</p>
+    </Dialog>
+  );
+}
+
+function backupFailure(error: unknown): string {
+  if (error instanceof BackupError && error.reason === 'signature') {
+    return 'The passphrase is wrong or the file was changed. The garage was left unchanged.';
+  }
+  if (error instanceof BackupError && error.reason === 'validation') {
+    return 'This backup failed validation. The garage was left unchanged.';
+  }
+  return 'This file is not a garage backup. The garage was left unchanged.';
+}
+
+export function ExportDialog({ onClose, onExport }: { onClose: () => void; onExport: (passphrase: string) => Promise<void> }) {
+  const [passphrase, setPassphrase] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!passphrase) {
+      setError('Enter a passphrase.');
+      return;
+    }
+    const secret = passphrase;
+    setBusy(true);
+    setError('');
+    try {
+      await onExport(secret);
+      setPassphrase('');
+      onClose();
+    } catch {
+      setError('The backup could not be signed. Nothing was saved.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      title="Export garage"
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="export-form" disabled={busy}>
+            Download backup
+          </Button>
+        </>
+      }
+    >
+      <form id="export-form" className="flex flex-col gap-3" noValidate onSubmit={submit}>
+        <p className="text-sm leading-6 text-muted">The passphrase signs the file and is not saved.</p>
+        <TextField label="Passphrase" type="password" autoComplete="off" value={passphrase} onChange={(event) => setPassphrase(event.target.value)} error={error} />
+      </form>
+    </Dialog>
+  );
+}
+
+export function ImportDialog({
+  onClose,
+  onRead,
+  onConfirm,
+}: {
+  onClose: () => void;
+  onRead: (text: string, passphrase: string) => Promise<GarageData>;
+  onConfirm: (garage: GarageData) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [passphrase, setPassphrase] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<GarageData | null>(null);
+
+  function chooseFile(event: ChangeEvent<HTMLInputElement>) {
+    setFile(event.target.files?.[0] ?? null);
+    setError('');
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!file) {
+      setError('Choose a backup file.');
+      return;
+    }
+    if (!passphrase) {
+      setError('Enter the passphrase.');
+      return;
+    }
+    const secret = passphrase;
+    setBusy(true);
+    setError('');
+    try {
+      const garage = await onRead(await file.text(), secret);
+      setPassphrase('');
+      setPending(garage);
+    } catch (caught) {
+      setPending(null);
+      setError(backupFailure(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (pending) {
+    return (
+      <Dialog
+        title="Replace garage"
+        onClose={onClose}
+        footer={
+          <>
+            <Button variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                onConfirm(pending);
+                onClose();
+              }}
+            >
+              Replace garage
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm leading-6">
+          Replace the garage with this backup? The {pending.vehicles.length} vehicles, {pending.serviceTypes.length} service types, {pending.services.length} service records, and {pending.fuelUps.length} fill-ups in the file will overwrite what is stored in this browser.
+        </p>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog
+      title="Import garage"
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="import-form" disabled={busy}>
+            Continue
+          </Button>
+        </>
+      }
+    >
+      <form id="import-form" className="flex flex-col gap-3" noValidate onSubmit={submit}>
+        <p className="text-sm leading-6 text-muted">The passphrase checks the signature and is not saved. A bad file leaves this garage as it is.</p>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="backup-file" className="text-sm font-medium">
+            Backup file
+          </label>
+          <input id="backup-file" type="file" accept="application/json,.json" className="w-full text-sm" onChange={chooseFile} />
+        </div>
+        <TextField label="Passphrase" type="password" autoComplete="off" value={passphrase} onChange={(event) => setPassphrase(event.target.value)} />
+        {error ? <p className="text-sm text-overdue">{error}</p> : null}
+      </form>
     </Dialog>
   );
 }

@@ -6,6 +6,7 @@ export type GarageAction =
   | { type: 'remove-vehicle'; id: string }
   | { type: 'add-service'; service: ServiceRecord }
   | { type: 'add-fuel'; fuel: FuelUp }
+  | { type: 'update-fuel'; fuel: FuelUp }
   | { type: 'add-service-type'; serviceType: ServiceType }
   | { type: 'remove-service-type'; id: string };
 
@@ -45,6 +46,16 @@ export function garageReducer(state: GarageData, action: GarageAction): GarageDa
         ),
         fuelUps: [...state.fuelUps, action.fuel],
       };
+    case 'update-fuel': {
+      if (!state.fuelUps.some((fuel) => fuel.id === action.fuel.id)) return state;
+      return {
+        ...state,
+        vehicles: state.vehicles.map((vehicle) =>
+          vehicle.id === action.fuel.vehicleId ? bumpMileage(vehicle, action.fuel.odometer) : vehicle,
+        ),
+        fuelUps: state.fuelUps.map((fuel) => (fuel.id === action.fuel.id ? action.fuel : fuel)),
+      };
+    }
     case 'add-service-type':
       return { ...state, serviceTypes: [...state.serviceTypes, action.serviceType] };
     case 'remove-service-type':

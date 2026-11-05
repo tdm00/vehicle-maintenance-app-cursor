@@ -2,6 +2,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from '../../src/App';
+import { todayISO } from '../../src/domain/dates';
+import { formatDate, formatNumber } from '../../src/domain/format';
 import { STORAGE_KEY } from '../../src/domain/types';
 
 async function addCivic(user: ReturnType<typeof userEvent.setup>) {
@@ -91,5 +93,55 @@ describe('garage screen', () => {
     await user.click(screen.getByRole('button', { name: 'Remove vehicle' }));
     expect(screen.queryByRole('heading', { name: 'Weekend car' })).not.toBeInTheDocument();
     expect(screen.getByText(/garage is empty/i)).toBeInTheDocument();
+  });
+
+  it('edits a fill-up and shows the new mpg and running average', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await addCivic(user);
+
+    async function logFill(odometer: string, gallons: string, cost: string) {
+      await user.click(screen.getByRole('button', { name: 'Log fill-up' }));
+      await user.clear(screen.getByLabelText('Odometer'));
+      await user.type(screen.getByLabelText('Odometer'), odometer);
+      await user.type(screen.getByLabelText('Gallons'), gallons);
+      await user.type(screen.getByLabelText('Fuel cost'), cost);
+      await user.click(screen.getByRole('button', { name: 'Save fill-up' }));
+    }
+
+    await logFill('8000', '12', '30');
+    await logFill('8300', '10', '31');
+    await logFill('8620', '8', '32');
+
+    function fuelRow(odometer: string) {
+      const row = screen.getAllByRole('row').find((candidate) => candidate.textContent?.includes(odometer));
+      if (!row) throw new Error(`No fill-up row for ${odometer}`);
+      return row;
+    }
+
+    expect(screen.getByLabelText('Average fuel economy')).toHaveTextContent('34.4 mpg');
+    expect(fuelRow('8,300')).toHaveTextContent('30.0 mpg');
+    expect(fuelRow('8,620')).toHaveTextContent('40.0 mpg');
+    expect(fuelRow('8,620')).toHaveTextContent('34.4 mpg');
+
+    await user.click(screen.getByRole('button', { name: `Edit fill-up ${formatDate(todayISO())} ${formatNumber(8300)}` }));
+    expect(screen.getByRole('heading', { name: 'Edit fill-up' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Date')).toHaveValue(todayISO());
+    expect(screen.getByLabelText('Odometer')).toHaveValue('8300');
+    expect(screen.getByLabelText('Gallons')).toHaveValue('10');
+    expect(screen.getByLabelText('Fuel cost')).toHaveValue('31');
+
+    await user.clear(screen.getByLabelText('Gallons'));
+    await user.type(screen.getByLabelText('Gallons'), '20');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(screen.queryByRole('heading', { name: 'Edit fill-up' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Average fuel economy')).toHaveTextContent('22.1 mpg');
+    const edited = fuelRow('8,300');
+    expect(edited).toHaveTextContent('15.0 mpg');
+    expect(edited).not.toHaveTextContent('30.0 mpg');
+    expect(within(edited).getAllByRole('cell')[2]).toHaveTextContent('20');
+    expect(fuelRow('8,620')).toHaveTextContent('40.0 mpg');
+    expect(fuelRow('8,620')).toHaveTextContent('22.1 mpg');
   });
 });

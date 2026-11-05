@@ -88,14 +88,12 @@ export function VehicleDialog({
     >
       <form id="vehicle-form" className="flex flex-col gap-3" noValidate onSubmit={submit}>
         <TextField label="Description" value={description} onChange={(event) => setDescription(event.target.value)} error={errors.description} />
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <TextField label="Year" inputMode="numeric" value={year} onChange={(event) => setYear(event.target.value)} error={errors.year} />
           <TextField label="Make" value={make} onChange={(event) => setMake(event.target.value)} error={errors.make} />
           <TextField label="Model" value={model} onChange={(event) => setModel(event.target.value)} error={errors.model} />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <TextField label="Year" inputMode="numeric" value={year} onChange={(event) => setYear(event.target.value)} error={errors.year} />
-          <TextField label="Mileage" inputMode="numeric" value={mileage} onChange={(event) => setMileage(event.target.value)} error={errors.mileage} />
-        </div>
+        <TextField label="Mileage" inputMode="numeric" value={mileage} onChange={(event) => setMileage(event.target.value)} error={errors.mileage} />
         <SelectField label="Body type" value={bodyType} onChange={(event) => setBodyType(event.target.value as BodyType)}>
           {BODY_TYPES.map((type) => (
             <option key={type} value={type}>

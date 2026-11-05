@@ -9,9 +9,9 @@ test.beforeEach(async ({ page }) => {
 test('logs a vehicle, service, and fuel, then keeps them after reload', async ({ page }) => {
   await page.getByRole('button', { name: 'Add vehicle' }).click();
   await page.getByLabel('Description').fill('Daily driver');
+  await page.getByLabel('Year').fill('2010');
   await page.getByLabel('Make').fill('Honda');
   await page.getByLabel('Model').fill('Civic');
-  await page.getByLabel('Year').fill('2010');
   await page.getByLabel('Mileage').fill('8000');
   await page.getByLabel('Body type').selectOption('car');
   await page.getByRole('button', { name: 'Save vehicle' }).click();

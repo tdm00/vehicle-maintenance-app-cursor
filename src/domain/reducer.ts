@@ -14,9 +14,14 @@ function bumpMileage(vehicle: Vehicle, reading: number): Vehicle {
   return reading > vehicle.mileage ? { ...vehicle, mileage: reading } : vehicle;
 }
 
+function hasId(items: readonly { id: string }[], id: string): boolean {
+  return items.some((item) => item.id === id);
+}
+
 export function garageReducer(state: GarageData, action: GarageAction): GarageData {
   switch (action.type) {
     case 'add-vehicle':
+      if (hasId(state.vehicles, action.vehicle.id)) return state;
       return { ...state, vehicles: [...state.vehicles, action.vehicle] };
     case 'update-vehicle':
       return {
@@ -31,6 +36,7 @@ export function garageReducer(state: GarageData, action: GarageAction): GarageDa
         fuelUps: state.fuelUps.filter((fuel) => fuel.vehicleId !== action.id),
       };
     case 'add-service':
+      if (hasId(state.services, action.service.id)) return state;
       return {
         ...state,
         vehicles: state.vehicles.map((vehicle) =>
@@ -39,6 +45,7 @@ export function garageReducer(state: GarageData, action: GarageAction): GarageDa
         services: [...state.services, action.service],
       };
     case 'add-fuel':
+      if (hasId(state.fuelUps, action.fuel.id)) return state;
       return {
         ...state,
         vehicles: state.vehicles.map((vehicle) =>
@@ -47,7 +54,8 @@ export function garageReducer(state: GarageData, action: GarageAction): GarageDa
         fuelUps: [...state.fuelUps, action.fuel],
       };
     case 'update-fuel': {
-      if (!state.fuelUps.some((fuel) => fuel.id === action.fuel.id)) return state;
+      const current = state.fuelUps.find((fuel) => fuel.id === action.fuel.id);
+      if (!current || current.vehicleId !== action.fuel.vehicleId) return state;
       return {
         ...state,
         vehicles: state.vehicles.map((vehicle) =>

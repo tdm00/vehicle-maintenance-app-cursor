@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BackupError, createBackup, readBackup } from '../../src/domain/backup';
+import { BackupError, BACKUP_ITERATIONS, canonicalJson, createBackup, readBackup } from '../../src/domain/backup';
 import { emptyGarage } from '../../src/domain/storage';
 import type { GarageData } from '../../src/domain/types';
 
@@ -48,7 +48,23 @@ function reverseKeys(value: unknown): unknown {
   return value;
 }
 
+async function version1Backup(payload: GarageData, secret: string) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(canonicalJson(payload)));
+  const hex = [...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  return { version: 1 as const, payload, signature: hex };
+}
+
 describe('signed garage backup', () => {
+  it('rejects an empty passphrase', async () => {
+    const file = await createBackup(garage, passphrase);
+    await expect(createBackup(garage, '')).rejects.toMatchObject({ name: 'BackupError', reason: 'passphrase' });
+    await expect(createBackup(garage, '   ')).rejects.toMatchObject({ reason: 'passphrase' });
+    await expect(createBackup(garage, '\n\t')).rejects.toMatchObject({ reason: 'passphrase' });
+    await expect(readBackup(file, '')).rejects.toMatchObject({ reason: 'passphrase' });
+    await expect(readBackup(file, ' \t ')).rejects.toMatchObject({ reason: 'passphrase' });
+  });
+
   it('rejects a flipped bit or the wrong passphrase', async () => {
     const file = await createBackup(garage, passphrase);
     await expect(readBackup({ ...file, signature: flipHexBit(file.signature) }, passphrase)).rejects.toMatchObject({
@@ -72,14 +88,25 @@ describe('signed garage backup', () => {
     const file = await createBackup(garage, passphrase);
     const serialized = JSON.stringify(file);
     expect(serialized).not.toContain(passphrase);
-    expect(file.version).toBe(1);
+    expect(file.version).toBe(2);
+    expect(file.salt).toMatch(/^[0-9a-f]{32}$/);
+    expect(file.iterations).toBeGreaterThanOrEqual(BACKUP_ITERATIONS);
     expect(file.signature).toMatch(/^[0-9a-f]{64}$/);
 
     await expect(readBackup(JSON.parse(serialized), passphrase)).resolves.toEqual(garage);
+    await expect(readBackup({ ...file, iterations: file.iterations + BACKUP_ITERATIONS }, passphrase)).rejects.toMatchObject({ reason: 'signature' });
+    await expect(readBackup({ ...file, salt: flipHexBit(file.salt) }, passphrase)).rejects.toMatchObject({ reason: 'signature' });
 
     const reordered = JSON.parse(serialized) as { version: number; payload: unknown; signature: string };
     reordered.payload = reverseKeys(reordered.payload);
     await expect(readBackup(reordered, passphrase)).resolves.toEqual(garage);
+  });
+
+  it('still imports a version 1 file signed with the raw passphrase', async () => {
+    const file = await version1Backup(garage, passphrase);
+    await expect(readBackup(file, passphrase)).resolves.toEqual(garage);
+    await expect(readBackup({ ...file, signature: flipHexBit(file.signature) }, passphrase)).rejects.toMatchObject({ reason: 'signature' });
+    await expect(readBackup(file, 'wrong passphrase')).rejects.toMatchObject({ reason: 'signature' });
   });
 
   it('keeps insurance on the signed garage payload', async () => {

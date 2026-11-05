@@ -3,8 +3,8 @@ import { Button } from '../components/Button';
 import { Dialog } from '../components/Dialog';
 import { SelectField, TextField } from '../components/Field';
 import { BackupError } from '../domain/backup';
-import { todayISO } from '../domain/dates';
-import { BODY_TYPES, BODY_TYPE_LABELS, type BodyType, type FuelUp, type GarageData, type ServiceRecord, type ServiceType, type Vehicle } from '../domain/types';
+import { isISODate, todayISO } from '../domain/dates';
+import { BODY_TYPES, BODY_TYPE_LABELS, type BodyType, type FuelUp, type GarageData, type Insurance, type ServiceRecord, type ServiceType, type Vehicle } from '../domain/types';
 
 export interface VehicleDraft {
   description: string;
@@ -304,6 +304,87 @@ export function ServiceTypesDialog({
           </Button>
         </div>
       </form>
+    </Dialog>
+  );
+}
+
+export function InsuranceDialog({
+  initial,
+  onClose,
+  onSubmit,
+}: {
+  initial?: Insurance;
+  onClose: () => void;
+  onSubmit: (insurance: Insurance) => void;
+}) {
+  const [company, setCompany] = useState(initial?.company ?? '');
+  const [policyNumber, setPolicyNumber] = useState(initial?.policyNumber ?? '');
+  const [expiresOn, setExpiresOn] = useState(initial?.expiresOn ?? '');
+  const [phone, setPhone] = useState(initial?.phone ?? '');
+  const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const next: Record<string, string> = {};
+    if (!company.trim()) next.company = 'Company is required.';
+    if (!policyNumber.trim()) next.policyNumber = 'Policy number is required.';
+    if (!isISODate(expiresOn)) next.expiresOn = 'Enter an expiration date.';
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
+    const insurance: Insurance = {
+      company: company.trim(),
+      policyNumber: policyNumber.trim(),
+      expiresOn,
+    };
+    if (phone.trim()) insurance.phone = phone.trim();
+    if (notes.trim()) insurance.notes = notes.trim();
+    onSubmit(insurance);
+  }
+
+  return (
+    <Dialog
+      title={initial ? 'Edit insurance' : 'Add insurance'}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="insurance-form">
+            Save insurance
+          </Button>
+        </>
+      }
+    >
+      <form id="insurance-form" className="flex flex-col gap-3" noValidate onSubmit={submit}>
+        <TextField label="Company" value={company} onChange={(event) => setCompany(event.target.value)} error={errors.company} />
+        <TextField label="Policy number" value={policyNumber} onChange={(event) => setPolicyNumber(event.target.value)} error={errors.policyNumber} />
+        <TextField label="Expiration" type="date" value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} error={errors.expiresOn} />
+        <TextField label="Phone" type="tel" placeholder="Optional" value={phone} onChange={(event) => setPhone(event.target.value)} />
+        <TextField label="Notes" placeholder="Optional" value={notes} onChange={(event) => setNotes(event.target.value)} />
+      </form>
+    </Dialog>
+  );
+}
+
+export function ConfirmClearInsuranceDialog({ name, onClose, onConfirm }: { name: string; onClose: () => void; onConfirm: () => void }) {
+  return (
+    <Dialog
+      title="Clear insurance"
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={onConfirm}>
+            Clear policy
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm leading-6">Clear the insurance policy on {name}? The company, policy number, and expiration will be removed from this browser.</p>
     </Dialog>
   );
 }

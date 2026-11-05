@@ -9,6 +9,14 @@ export const BODY_TYPE_LABELS: Record<BodyType, string> = {
   suv: 'SUV',
 };
 
+export interface Insurance {
+  company: string;
+  policyNumber: string;
+  expiresOn: string;
+  phone?: string;
+  notes?: string;
+}
+
 export interface Vehicle {
   id: string;
   description: string;
@@ -18,6 +26,7 @@ export interface Vehicle {
   color: string;
   bodyType: BodyType;
   mileage: number;
+  insurance?: Insurance;
 }
 
 export interface ServiceType {

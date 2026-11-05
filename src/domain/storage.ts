@@ -1,6 +1,6 @@
 import { builtInServiceTypes } from './defaults';
 import { isISODate } from './dates';
-import { BODY_TYPES, SCHEMA_VERSION, STORAGE_KEY, type BodyType, type FuelUp, type GarageData, type ServiceRecord, type ServiceType, type Vehicle } from './types';
+import { BODY_TYPES, SCHEMA_VERSION, STORAGE_KEY, type BodyType, type FuelUp, type GarageData, type Insurance, type ServiceRecord, type ServiceType, type Vehicle } from './types';
 
 export interface KeyValueStore {
   getItem(key: string): string | null;
@@ -24,6 +24,30 @@ function bodyType(value: unknown): BodyType | null {
   return typeof value === 'string' && (BODY_TYPES as readonly string[]).includes(value) ? (value as BodyType) : null;
 }
 
+function optionalLine(value: unknown): string | undefined | null {
+  if (value == null || value === '') return undefined;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+/** A missing policy is allowed. A partial or invalid policy rejects the vehicle. */
+function normalizeInsurance(value: unknown): Insurance | undefined | null {
+  if (value == null) return undefined;
+  if (!isRecord(value)) return null;
+  const company = text(value.company);
+  const policyNumber = text(value.policyNumber);
+  const expiresOn = typeof value.expiresOn === 'string' ? value.expiresOn.trim() : '';
+  if (!company || !policyNumber || !isISODate(expiresOn)) return null;
+  const phone = optionalLine(value.phone);
+  const notes = optionalLine(value.notes);
+  if (phone === null || notes === null) return null;
+  const policy: Insurance = { company, policyNumber, expiresOn };
+  if (phone) policy.phone = phone;
+  if (notes) policy.notes = notes;
+  return policy;
+}
+
 function normalizeVehicle(value: unknown): Vehicle | null {
   if (!isRecord(value)) return null;
   const id = text(value.id);
@@ -36,7 +60,9 @@ function normalizeVehicle(value: unknown): Vehicle | null {
   const color = typeof value.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(value.color) ? value.color : '#1e3a5f';
   if (!id || !description || !make || !model || year == null || mileage == null || !type) return null;
   if (year < 1900 || year > 2100 || mileage < 0) return null;
-  return {
+  const insurance = normalizeInsurance(value.insurance);
+  if (insurance === null) return null;
+  const vehicle: Vehicle = {
     id,
     description,
     make,
@@ -46,6 +72,8 @@ function normalizeVehicle(value: unknown): Vehicle | null {
     bodyType: type,
     mileage,
   };
+  if (insurance) vehicle.insurance = insurance;
+  return vehicle;
 }
 
 function normalizeServiceType(value: unknown): ServiceType | null {

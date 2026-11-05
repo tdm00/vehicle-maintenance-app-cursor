@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from '../../src/App';
@@ -143,5 +143,56 @@ describe('garage screen', () => {
     expect(within(edited).getAllByRole('cell')[2]).toHaveTextContent('20');
     expect(fuelRow('8,620')).toHaveTextContent('40.0 mpg');
     expect(fuelRow('8,620')).toHaveTextContent('22.1 mpg');
+  });
+
+  it('adds a policy, edits the phone, and lists an expired policy', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await addCivic(user);
+
+    const insurance = screen.getByRole('region', { name: 'Insurance' });
+    expect(insurance).toHaveTextContent('No policy on file.');
+
+    await user.click(screen.getByRole('button', { name: 'Add insurance' }));
+    await user.type(screen.getByLabelText('Company'), 'Acme Mutual');
+    await user.type(screen.getByLabelText('Policy number'), 'POL-100');
+    fireEvent.change(screen.getByLabelText('Expiration'), { target: { value: '2020-01-15' } });
+    await user.type(screen.getByLabelText('Phone'), '555-0100');
+    await user.type(screen.getByLabelText('Notes'), 'Liability only');
+    await user.click(screen.getByRole('button', { name: 'Save insurance' }));
+
+    expect(insurance).toHaveTextContent('Acme Mutual');
+    expect(insurance).toHaveTextContent('POL-100');
+    expect(insurance).toHaveTextContent('Jan 15, 2020');
+    expect(insurance).toHaveTextContent('Expired');
+    expect(insurance).toHaveTextContent('555-0100');
+    expect(insurance).toHaveTextContent('Liability only');
+    expect(localStorage.getItem(STORAGE_KEY)).toContain('POL-100');
+
+    const tasks = screen.getByRole('region', { name: 'Garage tasks' });
+    const policyTask = within(tasks).getByRole('button', { name: /Insurance/i });
+    expect(policyTask).toHaveTextContent('Overdue');
+    expect(policyTask).toHaveTextContent('Daily driver');
+
+    await user.click(screen.getByRole('button', { name: 'Edit insurance' }));
+    await user.clear(screen.getByLabelText('Phone'));
+    await user.type(screen.getByLabelText('Phone'), '555-0199');
+    await user.click(screen.getByRole('button', { name: 'Save insurance' }));
+    expect(insurance).toHaveTextContent('555-0199');
+    expect(insurance).toHaveTextContent('Acme Mutual');
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.clear(screen.getByLabelText('Description'));
+    await user.type(screen.getByLabelText('Description'), 'Insured civic');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(screen.getByRole('heading', { name: 'Insured civic' })).toBeInTheDocument();
+    expect(insurance).toHaveTextContent('555-0199');
+    expect(within(tasks).getByRole('button', { name: /Insurance/i })).toHaveTextContent('Insured civic');
+
+    await user.click(screen.getByRole('button', { name: 'Clear insurance' }));
+    await user.click(screen.getByRole('button', { name: 'Clear policy' }));
+    expect(insurance).toHaveTextContent('No policy on file.');
+    expect(within(tasks).queryByRole('button', { name: /Insurance/i })).not.toBeInTheDocument();
+    expect(localStorage.getItem(STORAGE_KEY)).not.toContain('POL-100');
   });
 });

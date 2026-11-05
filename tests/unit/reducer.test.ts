@@ -65,3 +65,24 @@ describe('update fuel', () => {
     expect(missing).toBe(state);
   });
 });
+
+describe('update vehicle', () => {
+  it('replaces the vehicle so insurance is saved and cleared', () => {
+    const policy = { company: 'Acme Mutual', policyNumber: 'POL-100', expiresOn: '2027-06-01', phone: '555-0100' };
+    const saved = garageReducer(garage(), { type: 'update-vehicle', vehicle: { ...civic, insurance: policy } });
+    expect(saved.vehicles[0]?.insurance).toEqual(policy);
+
+    const without = { ...saved.vehicles[0]! };
+    delete without.insurance;
+    const cleared = garageReducer(saved, { type: 'update-vehicle', vehicle: without });
+    expect(cleared.vehicles[0]?.insurance).toBeUndefined();
+    expect(cleared.vehicles[0]?.description).toBe(civic.description);
+
+    const kept = garageReducer(saved, {
+      type: 'add-fuel',
+      fuel: { id: 'z', vehicleId: 'civic', date: '2026-04-01', odometer: 12000, gallons: 9, cost: 30 },
+    });
+    expect(kept.vehicles[0]?.mileage).toBe(12000);
+    expect(kept.vehicles[0]?.insurance).toEqual(policy);
+  });
+});

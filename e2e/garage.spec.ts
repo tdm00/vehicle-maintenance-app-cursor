@@ -134,3 +134,30 @@ test('edits a fill-up, exports a signed backup, and restores it', async ({ page 
   await expect(restored.getByRole('cell').nth(4)).toHaveText('15.0 mpg');
   await expect(restored.getByRole('cell').nth(5)).toHaveText('15.0 mpg');
 });
+
+test('saves insurance and keeps it after reload', async ({ page }) => {
+  await addCivic(page);
+  await page.getByRole('button', { name: 'Add insurance' }).click();
+  await page.getByLabel('Company').fill('Acme Mutual');
+  await page.getByLabel('Policy number').fill('POL-100');
+  await page.getByLabel('Expiration').fill('2027-06-01');
+  await page.getByLabel('Phone').fill('555-0100');
+  await page.getByLabel('Notes').fill('Full coverage');
+  await page.getByRole('button', { name: 'Save insurance' }).click();
+
+  const insurance = page.getByRole('region', { name: 'Insurance' });
+  await expect(insurance).toContainText('Acme Mutual');
+  await expect(insurance).toContainText('POL-100');
+  await expect(insurance).toContainText('555-0100');
+  await expect(insurance).toContainText('Full coverage');
+
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Daily driver' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Insurance' })).toContainText('Acme Mutual');
+  await expect(page.getByRole('region', { name: 'Insurance' })).toContainText('POL-100');
+  await expect(page.getByRole('region', { name: 'Insurance' })).toContainText('555-0100');
+  await expect(page.getByRole('region', { name: 'Insurance' })).toContainText('Jun 1, 2027');
+
+  const overflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+  expect(overflows).toBe(false);
+});

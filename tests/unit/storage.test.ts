@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { builtInServiceTypes } from '../../src/domain/defaults';
-import { emptyGarage, loadGarage, migrate, saveGarage, type KeyValueStore } from '../../src/domain/storage';
+import { emptyGarage, loadGarage, migrate, normalizeGarage, saveGarage, type KeyValueStore } from '../../src/domain/storage';
 import { STORAGE_KEY, type GarageData, type Vehicle } from '../../src/domain/types';
 
 function memory(): KeyValueStore & { raw(): string | null } {
@@ -95,5 +95,78 @@ describe('localStorage load, save, and migration', () => {
     });
     expect(cleaned.services.map((service) => service.id)).toEqual(['ok']);
     expect(cleaned.fuelUps).toHaveLength(1);
+  });
+
+  it('loads a vehicle that has no insurance', () => {
+    const loaded = migrate({ version: 1, vehicles: [civic], services: [], fuelUps: [] });
+    expect(loaded.vehicles).toEqual([civic]);
+    expect(loaded.vehicles[0]?.insurance).toBeUndefined();
+
+    const explicitEmpty = migrate({ version: 1, vehicles: [{ ...civic, insurance: null }], services: [], fuelUps: [] });
+    expect(explicitEmpty.vehicles).toEqual([civic]);
+  });
+
+  it('round-trips a policy', () => {
+    const insured: Vehicle = {
+      ...civic,
+      insurance: {
+        company: 'Acme Mutual',
+        policyNumber: 'POL-100',
+        expiresOn: '2027-06-01',
+        phone: '555-0100',
+        notes: 'Full coverage',
+      },
+    };
+    const requiredOnly: Vehicle = {
+      ...civic,
+      id: 'truck',
+      description: 'Work truck',
+      bodyType: 'truck',
+      insurance: { company: 'Northline', policyNumber: 'T-9', expiresOn: '2028-01-31' },
+    };
+    const store = memory();
+    const data: GarageData = { ...emptyGarage(), vehicles: [insured, requiredOnly] };
+    saveGarage(store, data);
+    expect(loadGarage(store)).toEqual(data);
+    expect(store.raw()).toContain('"version":1');
+  });
+
+  it('rejects a policy missing a company', () => {
+    function vehiclesWith(insurance: unknown) {
+      return migrate({
+        version: 1,
+        vehicles: [{ ...civic, insurance }],
+        services: [],
+        fuelUps: [],
+      }).vehicles;
+    }
+
+    expect(vehiclesWith({ policyNumber: 'P-1', expiresOn: '2027-05-01' })).toEqual([]);
+    expect(vehiclesWith({ company: 'Acme', expiresOn: '2027-05-01' })).toEqual([]);
+    expect(vehiclesWith({ company: 'Acme', policyNumber: 'P-1', expiresOn: 'not-a-date' })).toEqual([]);
+    expect(vehiclesWith({ company: 'Acme', policyNumber: 'P-1', expiresOn: '2027-02-31' })).toEqual([]);
+
+    const partial = { ...civic, id: 'partial', insurance: { policyNumber: 'P-1', expiresOn: '2027-05-01' } };
+    const loaded = migrate({
+      version: 1,
+      vehicles: [civic, partial],
+      serviceTypes: builtInServiceTypes(),
+      services: [
+        { id: 'keep', vehicleId: 'civic', date: '2026-01-02', serviceTypeIds: ['oil-change'], cost: null, mileage: 10 },
+        { id: 'drop', vehicleId: 'partial', date: '2026-01-02', serviceTypeIds: ['oil-change'], cost: null, mileage: 10 },
+      ],
+      fuelUps: [],
+    });
+    expect(loaded.vehicles).toEqual([civic]);
+    expect(loaded.services.map((service) => service.id)).toEqual(['keep']);
+    expect(
+      normalizeGarage({
+        version: 1,
+        vehicles: [partial],
+        serviceTypes: [],
+        services: [],
+        fuelUps: [],
+      }),
+    ).toBeNull();
   });
 });

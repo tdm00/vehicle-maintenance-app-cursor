@@ -7,9 +7,9 @@ import { STORAGE_KEY } from '../../src/domain/types';
 async function addCivic(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Add vehicle' }));
   await user.type(screen.getByLabelText('Description'), 'Daily driver');
+  await user.type(screen.getByLabelText('Year'), '2010');
   await user.type(screen.getByLabelText('Make'), 'Honda');
   await user.type(screen.getByLabelText('Model'), 'Civic');
-  await user.type(screen.getByLabelText('Year'), '2010');
   await user.type(screen.getByLabelText('Mileage'), '8000');
   await user.selectOptions(screen.getByLabelText('Body type'), 'car');
   await user.click(screen.getByRole('button', { name: 'Save vehicle' }));

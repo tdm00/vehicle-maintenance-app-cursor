@@ -2,7 +2,7 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { VehicleArt } from '../components/VehicleArt';
 import { todayISO } from '../domain/dates';
-import { assessService } from '../domain/due';
+import { assessInsurance, assessService } from '../domain/due';
 import { formatDate, formatMoney, formatMpg, formatNumber } from '../domain/format';
 import { lookupInterval } from '../domain/intervals';
 import { economyById, fuelEconomy } from '../domain/mpg';
@@ -22,6 +22,9 @@ export function VehicleDetail({
   onLogService,
   onLogFuel,
   onEditFuel,
+  onAddInsurance,
+  onEditInsurance,
+  onClearInsurance,
 }: {
   vehicle: Vehicle | null;
   serviceTypes: ServiceType[];
@@ -32,6 +35,9 @@ export function VehicleDetail({
   onLogService: () => void;
   onLogFuel: () => void;
   onEditFuel: (fuel: FuelUp) => void;
+  onAddInsurance: () => void;
+  onEditInsurance: () => void;
+  onClearInsurance: () => void;
 }) {
   if (!vehicle) {
     return (
@@ -50,6 +56,9 @@ export function VehicleDetail({
   const economy = fuelEconomy(vehicleFuel);
   const byFill = economyById(economy);
   const today = todayISO();
+  const coverage = vehicle.insurance ? assessInsurance(vehicle.insurance.expiresOn, today) : null;
+  const expirationClass =
+    coverage?.status === 'expired' ? 'font-medium text-overdue' : coverage?.status === 'due-soon' ? 'font-medium text-soon' : 'font-medium';
 
   return (
     <Card id="vehicle-detail" aria-label="Selected vehicle" className="p-4">
@@ -101,6 +110,56 @@ export function VehicleDetail({
           Log fill-up
         </Button>
       </div>
+
+      <section className="mt-6" aria-label="Insurance">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-display text-xl">Insurance</h3>
+          {vehicle.insurance ? (
+            <div className="flex gap-2">
+              <Button variant="secondary" aria-label="Edit insurance" onClick={onEditInsurance}>
+                Edit
+              </Button>
+              <Button variant="danger" aria-label="Clear insurance" onClick={onClearInsurance}>
+                Clear
+              </Button>
+            </div>
+          ) : (
+            <Button variant="secondary" onClick={onAddInsurance}>
+              Add insurance
+            </Button>
+          )}
+        </div>
+        {vehicle.insurance ? (
+          <dl className="mt-2 grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt className="text-xs text-muted">Company</dt>
+              <dd className="font-medium break-words">{vehicle.insurance.company}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted">Policy number</dt>
+              <dd className="font-medium break-words">{vehicle.insurance.policyNumber}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted">Expiration</dt>
+              <dd className={expirationClass}>
+                {formatDate(vehicle.insurance.expiresOn)}
+                {coverage?.status === 'expired' ? ' · Expired' : null}
+                {coverage?.status === 'due-soon' ? ' · Due soon' : null}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted">Phone</dt>
+              <dd className="font-medium break-words">{vehicle.insurance.phone ?? '—'}</dd>
+            </div>
+            <div className="col-span-2">
+              <dt className="text-xs text-muted">Notes</dt>
+              <dd className="font-medium break-words whitespace-pre-wrap">{vehicle.insurance.notes ?? '—'}</dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="mt-1 text-sm text-muted">No policy on file.</p>
+        )}
+      </section>
 
       <section className="mt-6" aria-label="Fuel log">
         <h3 className="font-display text-xl">Fuel</h3>

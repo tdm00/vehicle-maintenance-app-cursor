@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addMonths } from '../../src/domain/dates';
 import { builtInServiceTypes, SERVICE_IDS } from '../../src/domain/defaults';
-import { assessService, garageTasks } from '../../src/domain/due';
+import { assessInsurance, assessService, garageTasks } from '../../src/domain/due';
 import { emptyGarage } from '../../src/domain/storage';
 import type { Vehicle } from '../../src/domain/types';
 
@@ -174,5 +174,42 @@ describe('due and overdue rules', () => {
     expect(tasks.map((task) => task.serviceTypeId)).toEqual([SERVICE_IDS.oil, SERVICE_IDS.tire]);
     expect(tasks[0].status).toBe('overdue');
     expect(tasks[1].status).toBe('due-soon');
+  });
+});
+
+describe('insurance expiration', () => {
+  const today = '2026-06-01';
+
+  it('is expired, due soon within 30 days, or fine', () => {
+    expect(assessInsurance('2026-05-31', today)).toMatchObject({ status: 'expired', headline: 'Overdue by 1 day' });
+    expect(assessInsurance('2026-06-01', today)).toMatchObject({ status: 'due-soon', headline: 'Due now' });
+    expect(assessInsurance('2026-07-01', today)).toMatchObject({ status: 'due-soon', headline: 'Due soon — 30 days left' });
+    expect(assessInsurance('2026-07-02', today).status).toBe('fine');
+  });
+
+  it('lists expired and due-soon policies with the other tasks, expired first', () => {
+    const data = emptyGarage();
+    data.serviceTypes = [];
+    data.vehicles = [
+      vehicle({
+        id: 'soon',
+        description: 'Soon',
+        insurance: { company: 'A', policyNumber: '1', expiresOn: '2026-06-20' },
+      }),
+      vehicle({
+        id: 'late',
+        description: 'Late',
+        insurance: { company: 'B', policyNumber: '2', expiresOn: '2026-05-01' },
+      }),
+      vehicle({
+        id: 'fine',
+        description: 'Fine',
+        insurance: { company: 'C', policyNumber: '3', expiresOn: '2026-12-01' },
+      }),
+    ];
+    const tasks = garageTasks(data, today);
+    expect(tasks.map((task) => task.vehicleId)).toEqual(['late', 'soon']);
+    expect(tasks[0]).toMatchObject({ serviceTypeName: 'Insurance', status: 'overdue', vehicleName: 'Late' });
+    expect(tasks[1]).toMatchObject({ serviceTypeName: 'Insurance', status: 'due-soon', vehicleName: 'Soon' });
   });
 });

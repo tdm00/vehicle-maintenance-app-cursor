@@ -106,6 +106,36 @@ export function assessService(input: {
   };
 }
 
+export const INSURANCE_DUE_SOON_DAYS = 30;
+
+export type InsuranceStatus = 'expired' | 'due-soon' | 'fine';
+
+export interface InsuranceAssessment {
+  status: InsuranceStatus;
+  urgency: number;
+  headline: string;
+}
+
+export function assessInsurance(expiresOn: string, today: string): InsuranceAssessment {
+  const daysLeft = daysBetween(today, expiresOn);
+  if (daysLeft < 0) {
+    const daysOver = -daysLeft;
+    return {
+      status: 'expired',
+      urgency: 1 + daysOver / INSURANCE_DUE_SOON_DAYS,
+      headline: `Overdue by ${unit(daysOver, 'day', 'days')}`,
+    };
+  }
+  if (daysLeft <= INSURANCE_DUE_SOON_DAYS) {
+    return {
+      status: 'due-soon',
+      urgency: (INSURANCE_DUE_SOON_DAYS - daysLeft) / (INSURANCE_DUE_SOON_DAYS + 1),
+      headline: daysLeft === 0 ? 'Due now' : `Due soon — ${unit(daysLeft, 'day', 'days')} left`,
+    };
+  }
+  return { status: 'fine', urgency: 0, headline: '' };
+}
+
 export function garageTasks(data: GarageData, today: string): GarageTask[] {
   const tasks: GarageTask[] = [];
   for (const vehicle of data.vehicles) {
@@ -131,6 +161,22 @@ export function garageTasks(data: GarageData, today: string): GarageTask[] {
         urgency: assessment.urgency,
         headline: assessment.headline,
       });
+    }
+    if (vehicle.insurance) {
+      const coverage = assessInsurance(vehicle.insurance.expiresOn, today);
+      if (coverage.status !== 'fine') {
+        tasks.push({
+          id: `${vehicle.id}:insurance`,
+          vehicleId: vehicle.id,
+          vehicleName: vehicle.description,
+          vehicleDetail: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+          serviceTypeId: 'insurance',
+          serviceTypeName: 'Insurance',
+          status: coverage.status === 'expired' ? 'overdue' : 'due-soon',
+          urgency: coverage.urgency,
+          headline: coverage.headline,
+        });
+      }
     }
   }
 

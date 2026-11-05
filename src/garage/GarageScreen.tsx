@@ -4,13 +4,13 @@ import { BackupError, createBackup, readBackup } from '../domain/backup';
 import { todayISO } from '../domain/dates';
 import { garageTasks } from '../domain/due';
 import type { FuelUp, GarageData, ServiceRecord, ServiceType, Vehicle } from '../domain/types';
-import { ConfirmRemoveDialog, ExportDialog, FuelDialog, ImportDialog, ServiceDialog, ServiceTypesDialog, VehicleDialog } from './forms';
+import { ConfirmClearInsuranceDialog, ConfirmRemoveDialog, ExportDialog, FuelDialog, ImportDialog, InsuranceDialog, ServiceDialog, ServiceTypesDialog, VehicleDialog } from './forms';
 import { TaskList } from './TaskList';
 import { useGarage } from './useGarage';
 import { VehicleDetail } from './VehicleDetail';
 import { VehicleList } from './VehicleList';
 
-type DialogState = 'create' | 'edit' | 'remove' | 'service' | 'fuel' | 'types' | 'export' | 'import' | null;
+type DialogState = 'create' | 'edit' | 'remove' | 'service' | 'fuel' | 'types' | 'export' | 'import' | 'insurance' | 'clear-insurance' | null;
 
 function downloadBackup(body: string) {
   const blob = new Blob([body], { type: 'application/json' });
@@ -82,6 +82,9 @@ export function GarageScreen() {
           onLogService={() => setDialog('service')}
           onLogFuel={() => setDialog('fuel')}
           onEditFuel={setFuelEdit}
+          onAddInsurance={() => setDialog('insurance')}
+          onEditInsurance={() => setDialog('insurance')}
+          onClearInsurance={() => setDialog('clear-insurance')}
         />
         <TaskList tasks={tasks} onSelectVehicle={selectVehicle} onManageTypes={() => setDialog('types')} />
       </main>
@@ -180,6 +183,31 @@ export function GarageScreen() {
           onConfirm={(garage) => {
             replace(garage);
             setSelectedId((current) => (current && garage.vehicles.some((vehicle) => vehicle.id === current) ? current : null));
+          }}
+        />
+      ) : null}
+
+      {dialog === 'insurance' && selected ? (
+        <InsuranceDialog
+          key={selected.id}
+          initial={selected.insurance}
+          onClose={() => setDialog(null)}
+          onSubmit={(insurance) => {
+            dispatch({ type: 'update-vehicle', vehicle: { ...selected, insurance } });
+            setDialog(null);
+          }}
+        />
+      ) : null}
+
+      {dialog === 'clear-insurance' && selected ? (
+        <ConfirmClearInsuranceDialog
+          name={selected.description}
+          onClose={() => setDialog(null)}
+          onConfirm={() => {
+            const vehicle = { ...selected };
+            delete vehicle.insurance;
+            dispatch({ type: 'update-vehicle', vehicle });
+            setDialog(null);
           }}
         />
       ) : null}

@@ -82,6 +82,27 @@ describe('signed garage backup', () => {
     await expect(readBackup(reordered, passphrase)).resolves.toEqual(garage);
   });
 
+  it('keeps insurance on the signed garage payload', async () => {
+    const insured: GarageData = {
+      ...garage,
+      vehicles: [
+        {
+          ...garage.vehicles[0]!,
+          insurance: {
+            company: 'Acme Mutual',
+            policyNumber: 'POL-100',
+            expiresOn: '2027-06-01',
+            phone: '555-0100',
+            notes: 'Full coverage',
+          },
+        },
+      ],
+    };
+    const file = await createBackup(insured, passphrase);
+    expect(file.payload.vehicles[0]?.insurance?.policyNumber).toBe('POL-100');
+    await expect(readBackup(JSON.parse(JSON.stringify(file)), passphrase)).resolves.toEqual(insured);
+  });
+
   it('rejects a signed payload that fails validation', async () => {
     const bogus = {
       version: 1 as const,

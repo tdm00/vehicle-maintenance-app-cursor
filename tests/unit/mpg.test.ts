@@ -55,6 +55,20 @@ describe('fuel economy', () => {
     expect(result.average).toBeCloseTo(20);
   });
 
+  it('leaves backwards gallons out of the running average when a later reading is higher', () => {
+    const result = fuelEconomy([
+      fill({ id: 'a', odometer: 10000, gallons: 11, date: '2026-01-01' }),
+      fill({ id: 'b', odometer: 10300, gallons: 10, date: '2026-02-01' }),
+      fill({ id: 'c', odometer: 10200, gallons: 50, date: '2026-03-01' }),
+      fill({ id: 'd', odometer: 10620, gallons: 8, date: '2026-04-01' }),
+    ]);
+    expect(result.perFill.find((row) => row.id === 'c')?.mpg).toBeNull();
+    expect(result.perFill.find((row) => row.id === 'c')?.runningAverage).toBeCloseTo(200 / 10);
+    expect(result.perFill.find((row) => row.id === 'd')?.mpg).toBeCloseTo(420 / 8);
+    expect(result.perFill.find((row) => row.id === 'd')?.runningAverage).toBeCloseTo(620 / 18);
+    expect(result.average).toBeCloseTo(620 / 18);
+  });
+
   it('returns no average when the odometer falls or no gallons were added after the first fill-up', () => {
     const backwards = fuelEconomy([
       fill({ id: 'a', odometer: 5000, gallons: 10 }),

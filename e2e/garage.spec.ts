@@ -99,8 +99,16 @@ test('edits a fill-up, exports a signed backup, and restores it', async ({ page 
   const backupPath = join(mkdtempSync(join(tmpdir(), 'garage-backup-')), 'garage-backup.json');
   await download.saveAs(backupPath);
 
-  const saved = JSON.parse(readFileSync(backupPath, 'utf8')) as { version: number; payload: { vehicles: { description: string }[] }; signature: string };
-  expect(saved.version).toBe(1);
+  const saved = JSON.parse(readFileSync(backupPath, 'utf8')) as {
+    version: number;
+    salt: string;
+    iterations: number;
+    payload: { vehicles: { description: string }[] };
+    signature: string;
+  };
+  expect(saved.version).toBe(2);
+  expect(saved.salt).toMatch(/^[0-9a-f]{32}$/);
+  expect(saved.iterations).toBeGreaterThanOrEqual(100_000);
   expect(saved.signature).toMatch(/^[0-9a-f]{64}$/);
   expect(saved.payload.vehicles[0]?.description).toBe('Daily driver');
   expect(readFileSync(backupPath, 'utf8')).not.toContain('open-sesame');

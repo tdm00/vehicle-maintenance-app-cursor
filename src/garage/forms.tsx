@@ -427,7 +427,7 @@ export function ExportDialog({ onClose, onExport }: { onClose: () => void; onExp
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!passphrase) {
+    if (!passphrase.trim()) {
       setError('Enter a passphrase.');
       return;
     }
@@ -494,7 +494,7 @@ export function ImportDialog({
       setError('Choose a backup file.');
       return;
     }
-    if (!passphrase) {
+    if (!passphrase.trim()) {
       setError('Enter the passphrase.');
       return;
     }

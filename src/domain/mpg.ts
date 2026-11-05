@@ -17,9 +17,11 @@ function byFillUp(a: FuelUp, b: FuelUp): number {
 
 /**
  * Fill-ups are ordered by date. Per-fill MPG is miles since the previous
- * fill-up divided by gallons. Overall MPG is miles from the first odometer
- * to the last, divided by gallons pumped after the first fill-up. The first
- * fill-up has no prior odometer, so it is kept and left out of the average.
+ * fill-up divided by gallons. A fill-up whose odometer is below the previous
+ * one has no per-fill MPG, and its gallons stay out of the running average
+ * and the overall average. Overall MPG is miles from the first odometer to
+ * the last, divided by the gallons that remain. The first fill-up has no
+ * prior odometer, so it is kept and left out of the average.
  */
 export function fuelEconomy(fillUps: readonly FuelUp[]): FuelEconomy {
   const sorted = [...fillUps].sort(byFillUp);
@@ -31,8 +33,9 @@ export function fuelEconomy(fillUps: readonly FuelUp[]): FuelEconomy {
     if (index === 0) return { id: fill.id, mpg: null, runningAverage: null };
     const previous = sorted[index - 1];
     const miles = fill.odometer - previous.odometer;
-    const mpg = fill.gallons > 0 && miles >= 0 ? miles / fill.gallons : null;
-    if (fill.gallons > 0) gallonsAfterFirst += fill.gallons;
+    const counted = miles >= 0 && fill.gallons > 0;
+    const mpg = counted ? miles / fill.gallons : null;
+    if (counted) gallonsAfterFirst += fill.gallons;
     const span = fill.odometer - first.odometer;
     const runningAverage = gallonsAfterFirst > 0 && span >= 0 ? span / gallonsAfterFirst : null;
     return { id: fill.id, mpg, runningAverage };
